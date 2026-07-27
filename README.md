@@ -1,3 +1,7 @@
+🔗 [Live demo](https://artigaund.github.io/rate-limiter/)
+![Rate Limiter CI](https://github.com/ArtiGaund/rate-limiter/actions/workflows/rate-limiter-healthcheck.yml/badge.svg)
+![Service Status](https://img.shields.io/website?url=https%3A%2F%2Frate-limiter-juyi.onrender.com%2Fhealth)
+
 # rate-limiter
 
 A standalone, Redis-backed rate limiter built in Java, used to protect the Gemini API usage in [StudySprout](https://www.studysprouts.in) from abuse — deployed independently and called over HTTP by the main app on every AI-generation request.
