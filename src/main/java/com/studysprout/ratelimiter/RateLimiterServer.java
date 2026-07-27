@@ -22,8 +22,8 @@ public final class RateLimiterServer {
     public RateLimiterServer(int port, String redisUrl, long capacity, double refillTokensPerSecond) throws IOException{
         this.redisBucket = new RedisTokenBucket(redisUrl, capacity, refillTokensPerSecond);
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
-        this.server.createContext("/check", new CheckHandler());
-        this.server.createContext("/health", exchange -> respond(exchange, 200, "{\"status\":\"ok\"}"));
+        this.server.createContext("/check", new CheckHandler()).getFilters().add(new CorsFilter());
+        this.server.createContext("/health", exchange -> respond(exchange, 200, "{\"status\":\"ok\"}")).getFilters().add(new CorsFilter());
         this.server.setExecutor(Executors.newFixedThreadPool(8));
     }
 
