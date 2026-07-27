@@ -77,6 +77,10 @@ for gap in 2 5 15 30 60; do
 done
 ```
 
+## Continuous health monitoring
+
+A GitHub Actions workflow (`.github/workflows/rate-limiter-healthcheck.yml`) pings the deployed `/health` endpoint on a schedule, so a service outage shows up as a failed CI run and a red badge at the top of this README — not just silently in a dashboard only I check.
+
 ## Tech stack
 
 - Java 21, `com.sun.net.httpserver` (no framework overhead for a single-purpose service)
