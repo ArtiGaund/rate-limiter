@@ -1,0 +1,42 @@
+name: Rate Limiter Health Check
+
+on:
+  workflow_dispatch:          # manual only — click "Run workflow" in the Actions tab
+                               # deliberately no schedule: this service is meant to sleep
+                               # on Render and wake only for real flashcard-generation traffic
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /health endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://rate-limiter-juyi.onrender.com/health)
+          echo "Health endpoint returned HTTP $response"
+          if [ "$response" != "200" ]; then
+            echo "::error::Health check failed with status $response"
+            exit 1
+          fi
+
+      - name: Verify token bucket actually enforces the limit
+        run: |
+          KEY="ci-check-$(date +%s)"
+          URL="https://rate-limiter-juyi.onrender.com/check"
+
+          first=$(curl -s "${URL}?key=${KEY}&tokens=1")
+          second=$(curl -s "${URL}?key=${KEY}&tokens=1")
+
+          echo "First request:  $first"
+          echo "Second request: $second"
+
+          if ! echo "$first" | grep -q '"allowed":true'; then
+            echo "::error::First request should have been allowed, but was denied. $first"
+            exit 1
+          fi
+
+          if echo "$second" | grep -q '"allowed":true'; then
+            echo "::error::Second immediate request should have been denied, but was allowed. Rate limiting may be broken. $second"
+            exit 1
+          fi
+
+          echo "Rate limiting verified: first request allowed, immediate second request correctly denied."
