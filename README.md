@@ -1,6 +1,6 @@
 # rate-limiter
 
-A standalone, Redis-backed rate limiter built in Java, used to protect the Gemini API usage in [StudySprout](#) from abuse — deployed independently and called over HTTP by the main app on every AI-generation request.
+A standalone, Redis-backed rate limiter built in Java, used to protect the Gemini API usage in [StudySprout](https://www.studysprouts.in) from abuse — deployed independently and called over HTTP by the main app on every AI-generation request.
 
 ## Why this exists
 
