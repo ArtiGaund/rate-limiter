@@ -358,15 +358,23 @@
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
       const ok = !!data.allowed;
-      const remainingNum = typeof data.remaining === 'number' ? data.remaining : projectedLiveTokens();
 
-      // this response is ground truth from the real server — it replaces our projection
-      liveConfirmedRemaining = remainingNum;
-      liveConfirmedAt = Date.now();
-
-      renderTank(remainingNum, LIVE_CAPACITY);
+      if(ok){
+        // Ground truth: the server just genuinely consumed a token, so we know the real
+        // value precisely. Resync our projection to this exact moment.
+        const remainingNum = typeof data.remaining === 'number' ? data.remaining : 0;
+        liveConfirmedRemaining = remainingNum;
+        liveConfirmedAt = Date.now();
+        renderTank(remainingNum, LIVE_CAPACITY);
+        addLogRow(true, remainingNum.toFixed(2), 'live');
+      } else {
+        // The server floors "remaining" to 0 on any denial, even mid-refill — that's less
+        // accurate than our own elapsed-time projection, so we don't let it override the
+        // animation. This click just confirms we're still under 1 token; nothing resets.
+        const projected = projectedLiveTokens();
+        addLogRow(false, projected.toFixed(2), 'live');
+      }
       flashTank(ok);
-      addLogRow(ok, remainingNum.toFixed(2), 'live');
     }catch(err){
       addLogRow(false, '—', 'live · unreachable');
       modeIndicator.textContent = 'Live request failed (likely CORS or network) — check the endpoint, or switch back to Simulated.';
