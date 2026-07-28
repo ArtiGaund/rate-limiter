@@ -266,6 +266,11 @@
                                                                           // so repeated clicks hit the
                                                                           // same bucket and denials actually show
 
+  const LIVE_CAPACITY = 1; // matches production BUCKET_CAPACITY — used only to draw the tank,
+                            // the actual enforcement always comes from the real server response
+  let liveTokens = LIVE_CAPACITY; // tracked separately from simulated tokens so switching modes
+                                   // never shows stale data from the other mode
+
   function updateRefillNote(){
     refillNote.textContent = `refills ${refillRate} tok/sec`;
   }
@@ -274,7 +279,7 @@
   capacityInput.addEventListener('change', ()=>{
     capacity = Math.max(1, parseFloat(capacityInput.value) || 1);
     tokens = Math.min(tokens, capacity);
-    renderTank();
+    if(mode === 'sim') renderTank(tokens, capacity);
   });
   refillInput.addEventListener('change', ()=>{
     refillRate = Math.max(0.001, parseFloat(refillInput.value) || 0.0166667);
@@ -288,10 +293,10 @@
     lastRefill = now;
   }
 
-  function renderTank(){
-    const pct = Math.max(0, Math.min(1, tokens / capacity)) * 100;
+  function renderTank(tokensVal, capacityVal){
+    const pct = Math.max(0, Math.min(1, tokensVal / capacityVal)) * 100;
     liquid.style.height = pct + '%';
-    readout.innerHTML = `${tokens.toFixed(2)} <small>/ ${capacity}</small>`;
+    readout.innerHTML = `${tokensVal.toFixed(2)} <small>/ ${capacityVal}</small>`;
   }
 
   function flashTank(ok){
@@ -331,7 +336,7 @@
     } else {
       ok = false;
     }
-    renderTank();
+    renderTank(tokens, capacity);
     flashTank(ok);
     addLogRow(ok, tokens.toFixed(2), 'simulated');
   }
@@ -343,9 +348,11 @@
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
       const ok = !!data.allowed;
-      const remaining = typeof data.remaining === 'number' ? data.remaining.toFixed(2) : '—';
+      const remainingNum = typeof data.remaining === 'number' ? data.remaining : liveTokens;
+      liveTokens = remainingNum;
+      renderTank(liveTokens, LIVE_CAPACITY);
       flashTank(ok);
-      addLogRow(ok, remaining, 'live');
+      addLogRow(ok, remainingNum.toFixed(2), 'live');
     }catch(err){
       addLogRow(false, '—', 'live · unreachable');
       modeIndicator.textContent = 'Live request failed (likely CORS or network) — check the endpoint, or switch back to Simulated.';
@@ -364,7 +371,7 @@
     liveUrlBox.classList.remove('show');
     configBox.style.display = '';
     modeIndicator.textContent = 'Mode: Simulated · math runs locally, matches the production token-bucket script';
-    tokens = capacity; lastRefill = Date.now(); renderTank();
+    tokens = capacity; lastRefill = Date.now(); renderTank(tokens, capacity);
   });
 
   liveBtn.addEventListener('click', ()=>{
@@ -374,13 +381,15 @@
     liveUrlBox.classList.add('show');
     configBox.style.display = 'none';
     modeIndicator.textContent = 'Mode: Live · calling the deployed rate-limiter service directly';
+    renderTank(liveTokens, LIVE_CAPACITY); // redraw with live state immediately, not leftover sim state
   });
 
-  // ambient refill tick so the tank visibly rises even without clicking, in sim mode
+  // ambient refill tick so the tank visibly rises even without clicking, in sim mode only —
+  // live mode never auto-refreshes, since that would mean polling the real service on a timer
   setInterval(()=>{
     if(mode === 'sim'){
       refillSim();
-      renderTank();
+      renderTank(tokens, capacity);
     }
   }, 250);
 
@@ -425,7 +434,7 @@
   document.getElementById('recheckBtn').addEventListener('click', pingHealth);
   liveUrlInput.addEventListener('change', pingHealth);
 
-  renderTank();
+  renderTank(liveTokens, LIVE_CAPACITY); // default mode is live on page load
 })();
 </script>
 </body>
