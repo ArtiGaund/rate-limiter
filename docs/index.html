@@ -266,10 +266,20 @@
                                                                           // so repeated clicks hit the
                                                                           // same bucket and denials actually show
 
-  const LIVE_CAPACITY = 1; // matches production BUCKET_CAPACITY — used only to draw the tank,
-                            // the actual enforcement always comes from the real server response
-  let liveTokens = LIVE_CAPACITY; // tracked separately from simulated tokens so switching modes
-                                   // never shows stale data from the other mode
+  const LIVE_CAPACITY = 1;          // matches production BUCKET_CAPACITY — for drawing the tank only
+  const LIVE_REFILL_RATE = 0.0166667; // matches production BUCKET_REFILL_PER_SEC (~1 token/60s) —
+                                       // used to project the live tank forward between real requests
+
+  // The live bucket's *actual* truth always lives on the server. Between real requests we don't
+  // know the exact value, so we project it forward from the last confirmed response using the
+  // same refill math the server itself uses. A real click always overwrites this with ground truth.
+  let liveConfirmedRemaining = LIVE_CAPACITY;
+  let liveConfirmedAt = Date.now();
+
+  function projectedLiveTokens(){
+    const elapsed = Math.max(0, (Date.now() - liveConfirmedAt) / 1000);
+    return Math.min(LIVE_CAPACITY, liveConfirmedRemaining + elapsed * LIVE_REFILL_RATE);
+  }
 
   function updateRefillNote(){
     refillNote.textContent = `refills ${refillRate} tok/sec`;
@@ -348,9 +358,13 @@
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
       const ok = !!data.allowed;
-      const remainingNum = typeof data.remaining === 'number' ? data.remaining : liveTokens;
-      liveTokens = remainingNum;
-      renderTank(liveTokens, LIVE_CAPACITY);
+      const remainingNum = typeof data.remaining === 'number' ? data.remaining : projectedLiveTokens();
+
+      // this response is ground truth from the real server — it replaces our projection
+      liveConfirmedRemaining = remainingNum;
+      liveConfirmedAt = Date.now();
+
+      renderTank(remainingNum, LIVE_CAPACITY);
       flashTank(ok);
       addLogRow(ok, remainingNum.toFixed(2), 'live');
     }catch(err){
@@ -371,7 +385,10 @@
     liveUrlBox.classList.remove('show');
     configBox.style.display = '';
     modeIndicator.textContent = 'Mode: Simulated · math runs locally, matches the production token-bucket script';
-    tokens = capacity; lastRefill = Date.now(); renderTank(tokens, capacity);
+    // no reset — refillSim() below already accounts for real elapsed time since you last looked,
+    // so this just reveals wherever the simulated bucket has actually gotten to
+    refillSim();
+    renderTank(tokens, capacity);
   });
 
   liveBtn.addEventListener('click', ()=>{
@@ -381,15 +398,19 @@
     liveUrlBox.classList.add('show');
     configBox.style.display = 'none';
     modeIndicator.textContent = 'Mode: Live · calling the deployed rate-limiter service directly';
-    renderTank(liveTokens, LIVE_CAPACITY); // redraw with live state immediately, not leftover sim state
+    // no reset — this shows the live bucket projected forward from its last confirmed value,
+    // exactly as if you'd been watching it the whole time
+    renderTank(projectedLiveTokens(), LIVE_CAPACITY);
   });
 
-  // ambient refill tick so the tank visibly rises even without clicking, in sim mode only —
-  // live mode never auto-refreshes, since that would mean polling the real service on a timer
+  // Both timers tick continuously, always, regardless of which mode is currently on screen —
+  // toggling only changes which one you're looking at, never pauses or resets either one.
   setInterval(()=>{
+    refillSim(); // always advances, even while Live is showing
     if(mode === 'sim'){
-      refillSim();
       renderTank(tokens, capacity);
+    } else {
+      renderTank(projectedLiveTokens(), LIVE_CAPACITY);
     }
   }, 250);
 
@@ -434,7 +455,7 @@
   document.getElementById('recheckBtn').addEventListener('click', pingHealth);
   liveUrlInput.addEventListener('change', pingHealth);
 
-  renderTank(liveTokens, LIVE_CAPACITY); // default mode is live on page load
+  renderTank(projectedLiveTokens(), LIVE_CAPACITY); // default mode is live on page load
 })();
 </script>
 </body>
