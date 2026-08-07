@@ -92,3 +92,8 @@ A GitHub Actions workflow (`.github/workflows/rate-limiter-healthcheck.yml`) pin
 - A rate limiter's correctness isn't just "does it block requests" — it's whether the *refill window* is longer than the operation it's protecting. A window that refills faster than the protected operation takes to run provides no real protection, even with perfectly atomic logic.
 - Key scoping is a product decision, not just a technical one — the "right" key shape depends on what usage pattern you're actually trying to prevent versus what you're accidentally throttling.
 - Fail-open vs. fail-closed on limiter downtime is a decision worth making explicitly, not by accident of a try/catch block.
+
+## License
+This project is not open source. The code is publicly viewable for portfolio 
+purposes, but all rights are reserved — please do not copy, reuse, or 
+redistribute without permission.
